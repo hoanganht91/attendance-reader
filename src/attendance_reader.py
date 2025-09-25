@@ -9,8 +9,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from zk import ZK
 from zk.exception import ZKError, ZKErrorConnection, ZKErrorResponse
-from .config_manager import DeviceConfig
-from .logger import get_logger
+from src.config_manager import DeviceConfig
+from src.logger import get_logger
 
 
 @dataclass

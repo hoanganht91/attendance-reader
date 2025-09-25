@@ -8,8 +8,8 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 from typing import List, Dict, Set, Optional
-from .attendance_reader import AttendanceRecord
-from .logger import get_logger
+from src.attendance_reader import AttendanceRecord
+from src.logger import get_logger
 
 
 class DataSync:

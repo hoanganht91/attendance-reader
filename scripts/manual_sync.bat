@@ -33,43 +33,14 @@ echo.
 :: Run manual sync
 python -c "
 import sys
-sys.path.append('.')
+import os
+sys.path.insert(0, '.')
 from src.main import AttendanceSystem
 
 system = AttendanceSystem()
 print('Initializing system...')
 success = system.run_once()
-
-if success:
-    print('\\n========================================')
-    print('Manual synchronization completed successfully!')
-    print('========================================')
-    
-    # Show sync statistics
-    try:
-        stats = system.data_sync.get_sync_statistics()
-        print(f'\\nSynchronization Statistics:')
-        print(f'- Total records: {stats.get(\"total_records\", 0)}')
-        print(f'- Recent records (24h): {stats.get(\"recent_records_24h\", 0)}')
-        print(f'- Devices synced: {stats.get(\"devices_synced\", 0)}')
-        print(f'- Data file size: {stats.get(\"data_file_size_mb\", 0)} MB')
-        
-        if stats.get('last_sync_time'):
-            print(f'- Last sync: {stats[\"last_sync_time\"]}')
-    except Exception as e:
-        print(f'Could not retrieve statistics: {e}')
-    
-    print('\\nData saved to: data\\\\attendance_records.txt')
-    print('Logs available in: logs\\\\app.log')
-else:
-    print('\\n========================================')
-    print('Manual synchronization failed!')
-    print('========================================')
-    print('\\nPlease check:')
-    print('1. Device configuration in config\\\\devices.yaml')
-    print('2. Network connectivity to devices')
-    print('3. Log files in logs\\\\ directory for error details')
-    sys.exit(1)
+print('Manual sync completed.' if success else 'Manual sync failed.')
 "
 
 if %errorLevel% equ 0 (

@@ -9,8 +9,8 @@ import servicemanager
 import win32event
 import win32service
 import win32serviceutil
-from .main import AttendanceSystem
-from .logger import setup_logger
+from src.main import AttendanceSystem
+from src.logger import setup_logger
 
 
 class AttendanceWindowsService(win32serviceutil.ServiceFramework):

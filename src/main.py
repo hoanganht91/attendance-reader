@@ -9,10 +9,10 @@ import sys
 import schedule
 from datetime import datetime
 from typing import List
-from .config_manager import ConfigManager
-from .attendance_reader import AttendanceReader
-from .data_sync import DataSync
-from .logger import get_logger, setup_logger
+from src.config_manager import ConfigManager
+from src.attendance_reader import AttendanceReader
+from src.data_sync import DataSync
+from src.logger import get_logger, setup_logger
 
 
 class AttendanceSystem:
