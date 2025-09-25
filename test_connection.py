@@ -91,7 +91,7 @@ def test_connection():
                 for user in users:
                     privilege_name = get_privilege_name(user.privilege)
                     card_id = user.card if user.card else "Không có"
-                    print(f"{user.uid:<8} {user.name:<25} {card_id:<15} {privilege_name:<15}")
+                    print(f"{user.user_id:<8} {user.name:<25} {card_id:<15} {privilege_name:<15}")
                 
                 # Lấy tất cả bản ghi chấm công
                 attendances = conn.get_attendance()
@@ -113,7 +113,7 @@ def test_connection():
                     print("-" * 82)
                     
                     # Tạo dictionary để map user ID với tên
-                    user_map = {user.uid: user.name for user in users}
+                    user_map = {user.user_id: user.name for user in users}
                     
                     # Sắp xếp theo thời gian
                     today_attendances.sort(key=lambda x: x.timestamp)
