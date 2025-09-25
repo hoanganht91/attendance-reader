@@ -22,18 +22,27 @@ def get_status_name(status):
     }
     return status_map.get(status, f"Không xác định ({status})")
 
-def get_verify_name(verify):
+def get_verify_name(punch):
     """Chuyển đổi mã xác thực thành tên"""
     verify_map = {
-        1: "Mật khẩu",
+        0: "Mật khẩu",
+        1: "Vân tay", 
+        2: "Mật khẩu",
         3: "Thẻ",
-        4: "Vân tay",
-        11: "Mật khẩu",
-        12: "Vân tay",
+        4: "Mật khẩu+Vân tay",
+        5: "Vân tay",
         15: "Khuôn mặt",
         25: "Lòng bàn tay"
     }
-    return verify_map.get(verify, f"Khác ({verify})")
+    return verify_map.get(punch, f"Khác ({punch})")
+
+def get_privilege_name(privilege):
+    """Chuyển đổi mã quyền thành tên"""
+    privilege_map = {
+        0: "Người dùng",
+        14: "Quản trị viên"
+    }
+    return privilege_map.get(privilege, f"Không xác định ({privilege})")
 
 def test_connection():
     """Test kết nối cơ bản tới máy chấm công"""
@@ -73,6 +82,17 @@ def test_connection():
                 device_time = conn.get_time()
                 print(f"🕐 Thời gian thiết bị: {device_time}")
                 
+                # Hiển thị danh sách người dùng
+                print(f"\n👥 DANH SÁCH NGƯỜI DÙNG:")
+                print("=" * 70)
+                print(f"{'ID':<8} {'Tên':<25} {'Card':<15} {'Quyền':<15}")
+                print("-" * 70)
+                
+                for user in users:
+                    privilege_name = get_privilege_name(user.privilege)
+                    card_id = user.card if user.card else "Không có"
+                    print(f"{user.uid:<8} {user.name:<25} {card_id:<15} {privilege_name:<15}")
+                
                 # Lấy tất cả bản ghi chấm công
                 attendances = conn.get_attendance()
                 print(f"📊 Tổng số bản ghi chấm công: {len(attendances)}")
@@ -89,8 +109,8 @@ def test_connection():
                 print("=" * 80)
                 
                 if today_attendances:
-                    print(f"{'User ID':<10} {'Tên người dùng':<20} {'Thời gian':<20} {'Trạng thái':<15} {'Verify':<10}")
-                    print("-" * 80)
+                    print(f"{'User ID':<10} {'Tên người dùng':<20} {'Thời gian':<20} {'Trạng thái':<15} {'Phương thức':<12}")
+                    print("-" * 82)
                     
                     # Tạo dictionary để map user ID với tên
                     user_map = {user.uid: user.name for user in users}
@@ -101,10 +121,10 @@ def test_connection():
                     for att in today_attendances:
                         user_name = user_map.get(att.user_id, "Không xác định")
                         status = get_status_name(att.status)
-                        verify = get_verify_name(att.verify)
+                        punch_method = get_verify_name(att.punch)
                         time_str = att.timestamp.strftime("%H:%M:%S")
                         
-                        print(f"{att.user_id:<10} {user_name:<20} {time_str:<20} {status:<15} {verify:<10}")
+                        print(f"{att.user_id:<10} {user_name:<20} {time_str:<20} {status:<15} {punch_method:<12}")
                     
                     print(f"\n📈 Tổng số lần chấm công hôm nay: {len(today_attendances)}")
                 else:
