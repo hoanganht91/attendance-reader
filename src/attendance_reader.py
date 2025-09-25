@@ -75,7 +75,7 @@ class AttendanceReader:
     
     def connect_device(self, device_config: DeviceConfig, timeout: int = 30) -> bool:
         """
-        Connect to a ZKTeco device
+        Connect to a ZKTeco device with keyboard interrupt support
         
         Args:
             device_config: Device configuration
@@ -90,8 +90,12 @@ class AttendanceReader:
                            ip=device_config.ip, 
                            port=device_config.port)
             
-            # Create ZK connection
-            zk = ZK(device_config.ip, port=device_config.port, timeout=timeout)
+            # Use very short timeout for better responsiveness to interrupts
+            # ZK library timeout cannot be interrupted, so keep it minimal
+            connection_timeout = min(timeout, 3)  # Max 3 seconds per connection attempt
+            zk = ZK(device_config.ip, port=device_config.port, timeout=connection_timeout)
+            
+            # Attempt connection
             conn = zk.connect()
             
             if conn:
@@ -110,6 +114,17 @@ class AttendanceReader:
             else:
                 raise ZKErrorConnection("Failed to establish connection")
                 
+        except KeyboardInterrupt:
+            self.logger.info(f"Connection interrupted by user", device=device_config.name)
+            raise  # Re-raise to allow upper levels to handle
+        except (ZKErrorConnection, ZKErrorResponse, ZKError) as e:
+            self.logger.log_device_connection(
+                device_config.name, 
+                device_config.ip, 
+                success=False, 
+                error_msg=f"ZK Error: {str(e)}"
+            )
+            return False
         except Exception as e:
             self.logger.log_device_connection(
                 device_config.name, 
@@ -119,23 +134,69 @@ class AttendanceReader:
             )
             return False
     
-    def disconnect_device(self, device_id: str) -> None:
-        """Disconnect from device"""
+    def disconnect_device(self, device_id: str) -> bool:
+        """
+        Disconnect from a specific device and clean up resources
+        
+        Args:
+            device_id: Device ID to disconnect
+            
+        Returns:
+            bool: True if disconnection successful
+        """
         try:
             if device_id in self._connections:
                 conn = self._connections[device_id]
-                conn.disconnect()
+                if conn:
+                    conn.disconnect()
+                    self.logger.debug(f"Disconnected from device", device_id=device_id)
                 del self._connections[device_id]
-                self.logger.debug(f"Disconnected from device", device_id=device_id)
+                return True
+            return True  # Already disconnected
+            
         except Exception as e:
-            self.logger.error(f"Error disconnecting from device", 
-                            device_id=device_id, exception=e)
+            self.logger.warning(f"Error disconnecting from device", 
+                              device_id=device_id, exception=e)
+            # Remove from cache even if disconnect failed
+            if device_id in self._connections:
+                del self._connections[device_id]
+            return False
     
     def disconnect_all(self) -> None:
-        """Disconnect from all devices"""
+        """Disconnect from all devices and clean up all connections"""
         device_ids = list(self._connections.keys())
+        
         for device_id in device_ids:
-            self.disconnect_device(device_id)
+            try:
+                self.disconnect_device(device_id)
+            except Exception as e:
+                self.logger.warning(f"Error disconnecting device during cleanup", 
+                                  device_id=device_id, exception=e)
+        
+        # Clear connections cache
+        self._connections.clear()
+        self.logger.debug("Disconnected from all devices")
+    
+    def get_connection_status(self) -> Dict[str, bool]:
+        """
+        Get connection status for all cached devices
+        
+        Returns:
+            Dictionary mapping device_id to connection status
+        """
+        status = {}
+        for device_id, conn in self._connections.items():
+            try:
+                # Test if connection is still alive
+                if conn:
+                    conn.get_time()  # Simple test operation
+                    status[device_id] = True
+                else:
+                    status[device_id] = False
+            except:
+                status[device_id] = False
+        
+        return status
     
     def get_users(self, device_config: DeviceConfig) -> List[UserInfo]:
         """
@@ -183,7 +244,7 @@ class AttendanceReader:
     def get_attendance_records(self, device_config: DeviceConfig, 
                              last_sync_time: Optional[datetime] = None) -> List[AttendanceRecord]:
         """
-        Get attendance records from device
+        Get attendance records from device with keyboard interrupt support
         
         Args:
             device_config: Device configuration
@@ -202,19 +263,32 @@ class AttendanceReader:
                 conn = self._connections[device_config.device_id]
             
             # Get attendance records
+            self.logger.debug(f"Retrieving attendance records", device=device_config.name)
             attendances = conn.get_attendance()
             
             # Get user information for name mapping
             users_dict = {}
             try:
+                self.logger.debug(f"Retrieving user information", device=device_config.name)
                 users = self.get_users(device_config)
                 users_dict = {user.user_id: user.name for user in users}
+            except KeyboardInterrupt:
+                self.logger.info(f"User data retrieval interrupted", device=device_config.name)
+                raise
             except Exception as e:
                 self.logger.warning(f"Could not get user names", 
                                   device=device_config.name, exception=e)
             
             # Process attendance records
-            for attendance in attendances:
+            self.logger.debug(f"Processing {len(attendances)} attendance records", 
+                            device=device_config.name)
+            
+            for i, attendance in enumerate(attendances):
+                # Check for interruption every 100 records for large datasets
+                if i % 100 == 0 and i > 0:
+                    self.logger.debug(f"Processed {i}/{len(attendances)} records", 
+                                    device=device_config.name)
+                
                 # Skip records before last sync time if specified
                 if last_sync_time and attendance.timestamp <= last_sync_time:
                     continue
@@ -239,6 +313,9 @@ class AttendanceReader:
                            total_records=len(attendances),
                            new_records=len(records))
             
+        except KeyboardInterrupt:
+            self.logger.info(f"Attendance record retrieval interrupted", device=device_config.name)
+            raise  # Re-raise to allow upper levels to handle
         except Exception as e:
             self.logger.error(f"Error getting attendance records", 
                             device=device_config.name, exception=e)
@@ -294,7 +371,7 @@ class AttendanceReader:
     
     def test_connection(self, device_config: DeviceConfig) -> Tuple[bool, str]:
         """
-        Test connection to device
+        Test connection to device with keyboard interrupt support
         
         Args:
             device_config: Device configuration
@@ -303,8 +380,8 @@ class AttendanceReader:
             Tuple of (success, message)
         """
         try:
-            # Try to connect
-            if not self.connect_device(device_config):
+            # Try to connect with very short timeout for testing
+            if not self.connect_device(device_config, timeout=2):
                 return False, "Connection failed"
             
             # Get connection
@@ -322,9 +399,16 @@ class AttendanceReader:
             
             return True, message
             
+        except KeyboardInterrupt:
+            self.logger.info(f"Connection test interrupted by user", device=device_config.name)
+            return False, "Connection test interrupted by user"
         except Exception as e:
             return False, f"Connection test failed: {str(e)}"
         
         finally:
             # Clean up test connection
-            self.disconnect_device(device_config.device_id) 
+            try:
+                self.disconnect_device(device_config.device_id)
+            except Exception as e:
+                self.logger.debug(f"Error cleaning up test connection", 
+                                device=device_config.name, exception=e) 
