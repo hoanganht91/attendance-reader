@@ -73,7 +73,7 @@ class AttendanceSystem:
             if success:
                 successful_connections += 1
                 self.logger.info(f"Connection test passed", 
-                               device=device.name, message=message)
+                               device=device.name, details=message)
             else:
                 self.logger.error(f"Connection test failed", 
                                 device=device.name, error=message)
